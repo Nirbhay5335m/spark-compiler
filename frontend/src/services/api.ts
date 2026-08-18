@@ -14,8 +14,8 @@ const getApiBase = (): string => {
   if (envUrl && typeof envUrl === 'string' && envUrl.trim()) {
     return envUrl.trim().replace(/\/+$/, '');
   }
-  // When running on GitHub Pages (github.io), automatically route to the live Render production backend
-  if (typeof window !== 'undefined' && window.location.hostname.includes('github.io')) {
+  // When running on public cloud hosting (Vercel or GitHub Pages), automatically route to the live Render backend
+  if (typeof window !== 'undefined' && (window.location.hostname.includes('vercel.app') || window.location.hostname.includes('github.io'))) {
     return 'https://spark-compiler.onrender.com/api';
   }
   return '/api';
