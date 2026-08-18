@@ -12,9 +12,23 @@ def _detect_java_home() -> str:
     if env_java and Path(env_java).exists():
         return env_java
     
+    # Check if java is in PATH
+    import shutil
+    java_path = shutil.which("java")
+    if java_path:
+        try:
+            real_path = Path(java_path).resolve()
+            if real_path.parent.name == "bin":
+                candidate = real_path.parent.parent
+                if (candidate / "bin" / "java").exists() or (candidate / "bin" / "java.exe").exists():
+                    return str(candidate)
+        except Exception:
+            pass
+
     # Standard Linux & Windows JDK locations
     candidates = [
         Path("/usr/lib/jvm/java-17-openjdk-amd64"),
+        Path("/usr/lib/jvm/java-17-openjdk-arm64"),
         Path("/usr/lib/jvm/default-java"),
         Path("/opt/java/openjdk"),
         Path(r"C:\Program Files\Eclipse Adoptium\jdk-17.0.20.8-hotspot"),
@@ -40,6 +54,15 @@ def _detect_spark_home() -> str:
     if env_spark and Path(env_spark).exists():
         return env_spark
     
+    # Check PySpark site-packages directory
+    try:
+        import pyspark
+        pyspark_dir = Path(pyspark.__file__).parent
+        if (pyspark_dir / "jars").exists() or (pyspark_dir / "bin").exists():
+            return str(pyspark_dir)
+    except Exception:
+        pass
+
     candidates = [
         Path("/opt/spark"),
         Path("/usr/local/spark"),

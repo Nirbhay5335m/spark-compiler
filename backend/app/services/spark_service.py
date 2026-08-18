@@ -278,6 +278,9 @@ class SparkService:
             logger.error(f"PySpark import failed: {e}")
             raise RuntimeError(f"PySpark is not accessible: {e}") from e
 
+        # Ensure _JAVA_OPTIONS is removed as it corrupts Py4J stdout gateway port reading
+        os.environ.pop("_JAVA_OPTIONS", None)
+
         logger.info(f"Lazily initializing SparkSession '{app_name}'...")
         spark = None
         try:
@@ -289,10 +292,6 @@ class SparkService:
                 .config("spark.driver.host", "127.0.0.1")
                 .config("spark.driver.bindAddress", "127.0.0.1")
                 .config("spark.sql.shuffle.partitions", "1")
-                .config("spark.default.parallelism", "1")
-                .config("spark.driver.memory", "350m")
-                .config("spark.driver.extraJavaOptions", "-Xms128m -Xmx384m -XX:+UseSerialGC")
-                .config("spark.executor.extraJavaOptions", "-Xms128m -Xmx384m -XX:+UseSerialGC")
                 .getOrCreate()
             )
             logger.info("SparkSession successfully acquired.")
@@ -387,6 +386,12 @@ class SparkService:
         ]
         for sk in sensitive_keys:
             env.pop(sk, None)
+
+        # Remove _JAVA_OPTIONS to prevent Py4J stdout gateway port corruption
+        env.pop("_JAVA_OPTIONS", None)
+
+        # Set clean PYSPARK_SUBMIT_ARGS for subprocess
+        env["PYSPARK_SUBMIT_ARGS"] = "pyspark-shell"
 
         if settings.JAVA_HOME:
             env["JAVA_HOME"] = settings.JAVA_HOME
