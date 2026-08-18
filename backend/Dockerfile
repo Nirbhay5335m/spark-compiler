@@ -15,9 +15,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Configure Java Environment
+# Configure Java Environment and Memory Limits for Containers
 ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
 ENV PATH="${JAVA_HOME}/bin:${PATH}"
+ENV _JAVA_OPTIONS="-Xms128m -Xmx384m -XX:+UseSerialGC"
+ENV SPARK_DRIVER_MEMORY="350m"
 
 # Set working directory
 WORKDIR /app
