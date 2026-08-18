@@ -1,0 +1,15 @@
+{
+  "name": "spark-compiler-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Enterprise Distributed Query & Execution Engine Monorepo",
+  "scripts": {
+    "dev:frontend": "npm run dev --prefix frontend",
+    "build:frontend": "npm run build --prefix frontend",
+    "dev:backend": "uvicorn backend.app.main:app --reload --port 8000",
+    "test:backend": "pytest backend/tests -v"
+  },
+  "keywords": ["spark", "compiler", "fastapi", "react", "pyspark"],
+  "author": "",
+  "license": "Apache-2.0"
+}

@@ -1,0 +1,7 @@
+order_id,customer_id,product_category,amount,currency,status
+1001,CUST-982,Electronics,249.99,USD,COMPLETED
+1002,CUST-104,Apparel,45.50,USD,COMPLETED
+1003,CUST-381,Home & Kitchen,112.00,USD,PENDING
+1004,CUST-982,Electronics,899.00,USD,COMPLETED
+1005,CUST-551,Books,19.95,USD,REFUNDED
+1006,CUST-723,Computers,1450.00,USD,COMPLETED

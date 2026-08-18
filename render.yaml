@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: spark-compiler-api
+    runtime: docker
+    dockerfilePath: Dockerfile
+    dockerContext: .
+    plan: free
+    region: oregon
+    healthCheckPath: /api/health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DEBUG
+        value: false
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: MAX_FILE_SIZE_BYTES
+        value: 26214400
+      - key: MAX_EXECUTION_TIMEOUT_SECONDS
+        value: 60
+      - key: MAX_RESULT_ROWS
+        value: 10000
