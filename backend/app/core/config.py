@@ -123,6 +123,7 @@ class Settings(BaseSettings):
     BASE_DIR: Path = Path(__file__).resolve().parent.parent.parent
     DATA_DIR: Path = BASE_DIR.parent / "data"
     UPLOAD_DIR: Path = DATA_DIR / "uploads"
+    SPARK_CONF_DIR: Path = BASE_DIR / "conf"
 
 
 settings = Settings()
@@ -133,6 +134,9 @@ if settings.JAVA_HOME and not os.environ.get("JAVA_HOME"):
 
 if settings.SPARK_HOME and not os.environ.get("SPARK_HOME"):
     os.environ["SPARK_HOME"] = settings.SPARK_HOME
+
+if settings.SPARK_CONF_DIR.exists():
+    os.environ["SPARK_CONF_DIR"] = str(settings.SPARK_CONF_DIR)
 
 # Ensure PySpark workers bind to the current python executable
 os.environ["PYSPARK_PYTHON"] = sys.executable

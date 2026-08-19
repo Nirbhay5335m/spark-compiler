@@ -1,0 +1,9 @@
+order_id,customer_id,category,product,amount,currency,date
+1001,CUST_001,Electronics,Wireless Headphones,149.99,USD,2026-01-15
+1002,CUST_002,Furniture,Ergonomic Desk Chair,289.50,USD,2026-01-16
+1003,CUST_003,Electronics,Mechanical Keyboard,99.00,USD,2026-01-17
+1004,CUST_001,Apparel,Running Shoes,120.00,USD,2026-01-18
+1005,CUST_004,Furniture,Standing Desk,450.00,USD,2026-01-19
+1006,CUST_005,Electronics,4K Ultra HD Monitor,379.99,USD,2026-01-20
+1007,CUST_002,Apparel,Winter Jacket,199.99,USD,2026-01-21
+1008,CUST_003,Furniture,Bookshelf,89.00,USD,2026-01-22
