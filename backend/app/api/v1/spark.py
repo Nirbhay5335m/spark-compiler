@@ -170,8 +170,22 @@ async def debug_spark_runtime():
         conf.set("spark.testing.memory", "200000000")
         gw = launch_gateway(conf)
         gateway_output = f"Gateway successfully acquired port: {gw.gateway_parameters.port}"
+    # Run java directly with PySpark jar classpath to see exact error
+    spark_submit_res = ""
+    java_test_res = ""
+    try:
+        import glob
+        pyspark_jars = glob.glob("/usr/local/lib/python3.11/site-packages/pyspark/jars/*.jar")
+        cp = ":".join(pyspark_jars)
+        res = subprocess.run(
+            [java_bin or "java", "-cp", cp, "org.apache.spark.deploy.SparkSubmit", "--version"],
+            capture_output=True,
+            text=True,
+            timeout=15
+        )
+        spark_submit_res = f"STDOUT: {res.stdout}\nSTDERR: {res.stderr}\nEXIT: {res.returncode}"
     except Exception as e:
-        gateway_err = f"{type(e).__name__}: {e}"
+        spark_submit_res = f"SparkSubmit Error: {e}"
 
     return {
         "java_bin": java_bin,
@@ -179,7 +193,7 @@ async def debug_spark_runtime():
         "JAVA_HOME": os.environ.get("JAVA_HOME"),
         "SPARK_HOME": os.environ.get("SPARK_HOME"),
         "SPARK_CONF_DIR": os.environ.get("SPARK_CONF_DIR"),
-        "sys_executable": sys.executable,
+        "spark_submit_test": spark_submit_res,
         "gateway_output": gateway_output,
         "gateway_error": gateway_err,
     }
