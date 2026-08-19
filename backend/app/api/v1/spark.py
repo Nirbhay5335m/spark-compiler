@@ -95,18 +95,17 @@ async def get_spark_status():
 @router.post(
     "/test",
     response_model=SparkTestResponse,
-    summary="Execute Lazy Spark DataFrame Test Job",
-    description="Lazily starts a local SparkSession, runs DataFrame transformations, captures results, and reliably stops the session."
+    summary="Execute Lazy Spark PySpark Transformation Test",
+    description="Initializes SparkSession on-demand and transforms sample dataframe records with active metrics collection."
 )
-async def test_spark_execution(payload: Optional[SparkTestRequest] = None):
-    """Executes a sample or custom DataFrame transformation on an on-demand SparkSession."""
+def run_spark_test(payload: Optional[SparkTestRequest] = None):
+    """Executes a managed Spark test job using the lazy SparkSession lifecycle."""
+    logger.info("Received request to run lazy Spark test job.")
     custom_records = payload.records if payload else None
-    logger.info("Received request to execute Spark DataFrame test job.")
-    
     result = spark_service.run_test_job(custom_records=custom_records)
     
     if not result.get("success"):
-        logger.error(f"Spark execution failed: {result.get('error')}")
+        logger.error(f"Spark execution test failed: {result.get('error')}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Spark execution failed: {result.get('error')}",
@@ -121,7 +120,7 @@ async def test_spark_execution(payload: Optional[SparkTestRequest] = None):
     summary="Execute Arbitrary PySpark Code Subprocess",
     description="Executes submitted Python / PySpark script in an isolated subprocess with active environment configuration and live stream capture."
 )
-async def execute_spark_code(payload: SparkExecuteRequest):
+def execute_spark_code(payload: SparkExecuteRequest):
     """Spawns an isolated Python subprocess to execute the provided code and returns stdout, stderr, execution metrics, and structured DataFrame results."""
     logger.info(f"Received request to execute code for job {payload.job_id or 'auto-generated'}.")
     
@@ -139,7 +138,7 @@ async def execute_spark_code(payload: SparkExecuteRequest):
     summary="Execute Spark SQL Query",
     description="Executes a Spark SQL query with auto-registered dataset temporary views and returns structured DataFrame results."
 )
-async def execute_spark_sql(payload: SparkSQLExecuteRequest):
+def execute_spark_sql(payload: SparkSQLExecuteRequest):
     """Executes a Spark SQL query on the lazy SparkSession with auto-registered dataset views."""
     logger.info(f"Received request to execute Spark SQL for job {payload.job_id or 'auto-generated'}.")
     result = spark_service.execute_sql(
@@ -151,7 +150,7 @@ async def execute_spark_sql(payload: SparkSQLExecuteRequest):
 
 
 @router.get("/debug")
-async def debug_spark_runtime():
+def debug_spark_runtime():
     """Diagnostic endpoint to inspect Java runtime, PySpark gateway launch output, and environment."""
     import os, sys, shutil, subprocess
     java_bin = shutil.which("java")
