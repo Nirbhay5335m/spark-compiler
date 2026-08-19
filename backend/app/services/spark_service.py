@@ -258,32 +258,31 @@ class SparkService:
             ),
         }
 
-    @contextmanager
-    def get_lazy_session(self, app_name: str = "SparkCompilerJob"):
-        """Context manager providing an on-demand SparkSession with safe cleanup."""
-        self._ensure_spark_path()
+    _shared_spark_session = None
+    _shared_spark_lock = threading.Lock()
 
-        # Set PySpark driver/worker interpreter to current Python executable
-        os.environ["PYSPARK_PYTHON"] = sys.executable
-        os.environ["PYSPARK_DRIVER_PYTHON"] = sys.executable
+    def get_shared_session(self, app_name: str = "SparkCompilerSession"):
+        """Returns a cached, persistent SparkSession to avoid expensive JVM spin-up costs per request."""
+        with self._shared_spark_lock:
+            if self._shared_spark_session is not None:
+                try:
+                    if not self._shared_spark_session._sc._jsc.sc().isStopped():
+                        return self._shared_spark_session
+                except Exception:
+                    self._shared_spark_session = None
 
-        if settings.JAVA_HOME and not os.environ.get("JAVA_HOME"):
-            os.environ["JAVA_HOME"] = settings.JAVA_HOME
-        if settings.SPARK_HOME and not os.environ.get("SPARK_HOME"):
-            os.environ["SPARK_HOME"] = settings.SPARK_HOME
+            self._ensure_spark_path()
+            os.environ["PYSPARK_PYTHON"] = sys.executable
+            os.environ["PYSPARK_DRIVER_PYTHON"] = sys.executable
+            os.environ.pop("_JAVA_OPTIONS", None)
 
-        try:
+            if settings.JAVA_HOME and not os.environ.get("JAVA_HOME"):
+                os.environ["JAVA_HOME"] = settings.JAVA_HOME
+            if settings.SPARK_HOME and not os.environ.get("SPARK_HOME"):
+                os.environ["SPARK_HOME"] = settings.SPARK_HOME
+
             from pyspark.sql import SparkSession
-        except ImportError as e:
-            logger.error(f"PySpark import failed: {e}")
-            raise RuntimeError(f"PySpark is not accessible: {e}") from e
-
-        # Ensure _JAVA_OPTIONS is removed as it corrupts Py4J stdout gateway port reading
-        os.environ.pop("_JAVA_OPTIONS", None)
-
-        logger.info(f"Lazily initializing SparkSession '{app_name}'...")
-        spark = None
-        try:
+            logger.info(f"Lazily initializing shared SparkSession '{app_name}'...")
             spark = (
                 SparkSession.builder
                 .master("local[1]")
@@ -294,22 +293,17 @@ class SparkService:
                 .config("spark.sql.shuffle.partitions", "1")
                 .getOrCreate()
             )
-            logger.info("SparkSession successfully acquired.")
-            yield spark
-        except Exception as e:
-            logger.error(f"Error during SparkSession execution: {e}", exc_info=True)
-            raise
-        finally:
-            if spark is not None:
-                logger.info(f"Safely stopping SparkSession '{app_name}'...")
-                try:
-                    spark.stop()
-                    logger.info("SparkSession stopped cleanly.")
-                except Exception as stop_err:
-                    logger.warning(f"Error stopping SparkSession: {stop_err}")
+            self._shared_spark_session = spark
+            return spark
+
+    @contextmanager
+    def get_lazy_session(self, app_name: str = "SparkCompilerJob"):
+        """Context manager providing an on-demand SparkSession with safe cleanup."""
+        spark = self.get_shared_session(app_name)
+        yield spark
 
     def run_test_job(self, custom_records: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
-        """Runs an isolated, lazy DataFrame transformation test and returns execution stats."""
+        """Runs an isolated DataFrame transformation test and returns execution stats."""
         start_time = time.perf_counter()
         
         default_data = [
@@ -322,37 +316,35 @@ class SparkService:
         input_data = custom_records if custom_records is not None else default_data
 
         try:
-            with self.get_lazy_session("SparkCompilerTestSession") as spark:
-                from pyspark.sql.functions import col, upper, when
+            spark = self.get_shared_session("SparkCompilerTestSession")
+            from pyspark.sql.functions import col, upper, when
 
-                df = spark.createDataFrame(input_data)
-                
-                # Perform sample DataFrame transformations
-                transformed_df = df.withColumn("module_upper", upper(col("module"))).withColumn(
-                    "is_high_throughput",
-                    when(col("tokens_processed") > 1000, True).otherwise(False)
-                )
+            df = spark.createDataFrame(input_data)
+            transformed_df = df.withColumn("module_upper", upper(col("module"))).withColumn(
+                "is_high_throughput",
+                when(col("tokens_processed") > 1000, True).otherwise(False)
+            )
 
-                # Collect results
-                collected_rows = [row.asDict() for row in transformed_df.collect()]
-                total_tokens = sum(row.get("tokens_processed", 0) for row in collected_rows)
-                active_modules = [r["module"] for r in collected_rows if r.get("status") == "active"]
+            # Collect results
+            collected_rows = [row.asDict() for row in transformed_df.collect()]
+            total_tokens = sum(row.get("tokens_processed", 0) for row in collected_rows)
+            active_modules = [r["module"] for r in collected_rows if r.get("status") == "active"]
 
-                elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
+            elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
 
-                return {
-                    "success": True,
-                    "execution_time_ms": elapsed_ms,
-                    "rows_processed": len(collected_rows),
-                    "spark_version": spark.version,
-                    "app_name": "SparkCompilerTestSession",
-                    "results": collected_rows,
-                    "summary": {
-                        "total_modules": len(collected_rows),
-                        "active_modules_count": len(active_modules),
-                        "total_tokens_processed": total_tokens,
-                    },
-                }
+            return {
+                "success": True,
+                "execution_time_ms": elapsed_ms,
+                "rows_processed": len(collected_rows),
+                "spark_version": spark.version,
+                "app_name": "SparkCompilerTestSession",
+                "results": collected_rows,
+                "summary": {
+                    "total_modules": len(collected_rows),
+                    "active_modules_count": len(active_modules),
+                    "total_tokens_processed": total_tokens,
+                },
+            }
         except Exception as e:
             elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
             logger.error(f"Spark test job failed: {e}")
