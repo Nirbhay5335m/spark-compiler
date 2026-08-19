@@ -311,9 +311,9 @@ class SparkService:
                 .config("spark.driver.bindAddress", "127.0.0.1")
                 .config("spark.sql.shuffle.partitions", "1")
                 .config("spark.default.parallelism", "1")
-                .config("spark.testing.memory", "200000000")
-                .config("spark.driver.memory", "200m")
-                .config("spark.executor.memory", "200m")
+                .config("spark.testing.memory", "471859200")
+                .config("spark.driver.memory", "512m")
+                .config("spark.executor.memory", "512m")
                 .getOrCreate()
             )
             self._shared_spark_session = spark
