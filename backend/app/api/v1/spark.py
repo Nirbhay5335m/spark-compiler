@@ -162,37 +162,12 @@ async def debug_spark_runtime():
 
     spark_sql_test_res = ""
     try:
+        os.environ.pop("SPARK_HOME", None)
+        os.environ.pop("_JAVA_OPTIONS", None)
+
+        from pyspark.java_gateway import launch_gateway
         from pyspark import SparkConf, SparkContext
         from pyspark.sql import SparkSession
-        from py4j.java_gateway import JavaGateway, GatewayParameters
-        import os, subprocess, pyspark
-
-        jars_dir = os.path.join(os.path.dirname(pyspark.__file__), "jars")
-        cp = f"{jars_dir}/*"
-        java_exe = os.path.join(os.environ.get("JAVA_HOME", "/usr/lib/jvm/java-17-openjdk-amd64"), "bin", "java")
-        cmd = [
-            java_exe,
-            "-Xms64m",
-            "-Xmx220m",
-            "-XX:+UseSerialGC",
-            "-XX:+TieredCompilation",
-            "-XX:TieredStopAtLevel=1",
-            "-Djava.security.egd=file:/dev/./urandom",
-            "-cp",
-            cp,
-            "py4j.GatewayServer",
-            "--die-on-broken-pipe",
-            "0"
-        ]
-        import secrets
-        auth_token = secrets.token_hex(16)
-        env = os.environ.copy()
-        env["PYSPARK_GATEWAY_SECRET"] = auth_token
-
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
-        port_line = proc.stdout.readline()
-        port = int(port_line.strip())
-        gw = JavaGateway(gateway_parameters=GatewayParameters(port=port, auth_token=auth_token, auto_convert=True))
 
         conf = SparkConf()
         conf.setMaster("local[1]")
@@ -203,14 +178,15 @@ async def debug_spark_runtime():
         conf.set("spark.sql.shuffle.partitions", "1")
         conf.set("spark.testing.memory", "200000000")
         conf.set("spark.driver.memory", "200m")
+        conf.set("spark.driver.extraJavaOptions", "-XX:+UseSerialGC -Xms64m -Xmx220m -Djava.security.egd=file:/dev/./urandom -XX:+TieredCompilation -XX:TieredStopAtLevel=1")
 
+        gw = launch_gateway(conf)
         sc = SparkContext(conf=conf, gateway=gw)
         spark = SparkSession(sc)
         df = spark.sql("SELECT 'Spark 4.2 Live on Render' as message, 100 as value")
         rows = [r.asDict() for r in df.collect()]
         spark_sql_test_res = f"SUCCESS: {rows}"
         spark.stop()
-        proc.terminate()
     except Exception as e:
         spark_sql_test_res = f"FAILED: {type(e).__name__}: {e}"
 
