@@ -89,7 +89,7 @@ class Settings(BaseSettings):
 
     # Security & Public Use Limits
     MAX_FILE_SIZE_BYTES: int = 25 * 1024 * 1024  # 25 MB max upload
-    MAX_EXECUTION_TIMEOUT_SECONDS: int = 60      # 60s max execution
+    MAX_EXECUTION_TIMEOUT_SECONDS: int = 120     # 120s max execution for containerized Spark
     MAX_RESULT_ROWS: int = 10000                 # 10,000 max rows
 
     # CORS

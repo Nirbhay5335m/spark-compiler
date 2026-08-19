@@ -506,7 +506,7 @@ except Exception:
         process: Optional[subprocess.Popen] = None
         try:
             process = subprocess.Popen(
-                [sys.executable, str(job_file)],
+                [sys.executable, "-u", str(job_file)],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
