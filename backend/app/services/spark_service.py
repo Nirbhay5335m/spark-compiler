@@ -287,7 +287,48 @@ class SparkService:
             self._ensure_spark_path()
             os.environ["PYSPARK_PYTHON"] = sys.executable
             os.environ["PYSPARK_DRIVER_PYTHON"] = sys.executable
+            os.environ["SPARK_LOCAL_IP"] = "127.0.0.1"
+            os.environ["SPARK_LOCAL_HOSTNAME"] = "127.0.0.1"
+            os.environ["PYSPARK_PIN_THREAD"] = "false"
             os.environ.pop("_JAVA_OPTIONS", None)
+
+            extra_java_opts = (
+                "-Djava.net.preferIPv4Stack=true "
+                "-Djava.security.egd=file:/dev/./urandom "
+                "-XX:+IgnoreUnrecognizedVMOptions "
+                "-XX:+UseSerialGC "
+                "-Xms64m "
+                "-Xmx220m "
+                "--add-opens=java.base/java.lang=ALL-UNNAMED "
+                "--add-opens=java.base/java.lang.invoke=ALL-UNNAMED "
+                "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED "
+                "--add-opens=java.base/java.io=ALL-UNNAMED "
+                "--add-opens=java.base/java.net=ALL-UNNAMED "
+                "--add-opens=java.base/java.nio=ALL-UNNAMED "
+                "--add-opens=java.base/java.util=ALL-UNNAMED "
+                "--add-opens=java.base/java.util.concurrent=ALL-UNNAMED "
+                "--add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED "
+                "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED "
+                "--add-opens=java.base/sun.nio.cs=ALL-UNNAMED "
+                "--add-opens=java.base/sun.security.action=ALL-UNNAMED "
+                "--add-opens=java.base/sun.util.calendar=ALL-UNNAMED "
+                "--add-opens=java.security.jgss/sun.security.krb5=ALL-UNNAMED "
+                "-Djdk.reflect.useDirectMethodHandle=false"
+            )
+
+            os.environ["PYSPARK_SUBMIT_ARGS"] = (
+                f"--master local[1] "
+                f"--conf spark.driver.memory=200m "
+                f"--conf spark.executor.memory=200m "
+                f"--conf spark.testing.memory=200000000 "
+                f"--conf spark.driver.host=127.0.0.1 "
+                f"--conf spark.driver.bindAddress=127.0.0.1 "
+                f"--conf spark.ui.enabled=false "
+                f"--conf spark.sql.shuffle.partitions=1 "
+                f"--conf spark.default.parallelism=1 "
+                f'--conf spark.driver.extraJavaOptions="{extra_java_opts}" '
+                f"pyspark-shell"
+            )
 
             if settings.JAVA_HOME and not os.environ.get("JAVA_HOME"):
                 os.environ["JAVA_HOME"] = settings.JAVA_HOME
@@ -310,6 +351,8 @@ class SparkService:
                 .config("spark.testing.memory", "200000000")
                 .config("spark.driver.memory", "200m")
                 .config("spark.executor.memory", "200m")
+                .config("spark.driver.extraJavaOptions", extra_java_opts)
+                .config("spark.executor.extraJavaOptions", extra_java_opts)
                 .getOrCreate()
             )
             self._shared_spark_session = spark
@@ -400,9 +443,47 @@ class SparkService:
 
         # Remove _JAVA_OPTIONS to prevent Py4J stdout gateway port corruption
         env.pop("_JAVA_OPTIONS", None)
+        env["SPARK_LOCAL_IP"] = "127.0.0.1"
+        env["SPARK_LOCAL_HOSTNAME"] = "127.0.0.1"
+        env["PYSPARK_PIN_THREAD"] = "false"
 
-        # Set clean PYSPARK_SUBMIT_ARGS for subprocess
-        env["PYSPARK_SUBMIT_ARGS"] = "pyspark-shell"
+        extra_java_opts = (
+            "-Djava.net.preferIPv4Stack=true "
+            "-Djava.security.egd=file:/dev/./urandom "
+            "-XX:+IgnoreUnrecognizedVMOptions "
+            "-XX:+UseSerialGC "
+            "-Xms64m "
+            "-Xmx220m "
+            "--add-opens=java.base/java.lang=ALL-UNNAMED "
+            "--add-opens=java.base/java.lang.invoke=ALL-UNNAMED "
+            "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED "
+            "--add-opens=java.base/java.io=ALL-UNNAMED "
+            "--add-opens=java.base/java.net=ALL-UNNAMED "
+            "--add-opens=java.base/java.nio=ALL-UNNAMED "
+            "--add-opens=java.base/java.util=ALL-UNNAMED "
+            "--add-opens=java.base/java.util.concurrent=ALL-UNNAMED "
+            "--add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED "
+            "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED "
+            "--add-opens=java.base/sun.nio.cs=ALL-UNNAMED "
+            "--add-opens=java.base/sun.security.action=ALL-UNNAMED "
+            "--add-opens=java.base/sun.util.calendar=ALL-UNNAMED "
+            "--add-opens=java.security.jgss/sun.security.krb5=ALL-UNNAMED "
+            "-Djdk.reflect.useDirectMethodHandle=false"
+        )
+
+        env["PYSPARK_SUBMIT_ARGS"] = (
+            f"--master local[1] "
+            f"--conf spark.driver.memory=200m "
+            f"--conf spark.executor.memory=200m "
+            f"--conf spark.testing.memory=200000000 "
+            f"--conf spark.driver.host=127.0.0.1 "
+            f"--conf spark.driver.bindAddress=127.0.0.1 "
+            f"--conf spark.ui.enabled=false "
+            f"--conf spark.sql.shuffle.partitions=1 "
+            f"--conf spark.default.parallelism=1 "
+            f'--conf spark.driver.extraJavaOptions="{extra_java_opts}" '
+            f"pyspark-shell"
+        )
 
         if settings.JAVA_HOME:
             env["JAVA_HOME"] = settings.JAVA_HOME

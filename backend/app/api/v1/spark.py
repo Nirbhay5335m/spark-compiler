@@ -160,30 +160,11 @@ async def debug_spark_runtime():
         res = subprocess.run([java_bin, "-version"], capture_output=True, text=True)
         java_ver = res.stderr or res.stdout
 
-    spark_sql_test_res = ""
+    exec_sql_res = None
     try:
-        os.environ.pop("SPARK_HOME", None)
-        os.environ.pop("_JAVA_OPTIONS", None)
-
-    spark_submit_err = ""
-    try:
-        import subprocess, tempfile, os
-        temp_dir = tempfile.mkdtemp()
-        conn_file = os.path.join(temp_dir, "conn_info")
-        env = dict(os.environ)
-        env["_PYSPARK_DRIVER_CONN_INFO_PATH"] = conn_file
-        env["JAVA_HOME"] = "/usr/lib/jvm/java-17-openjdk-amd64"
-        env["SPARK_HOME"] = "/usr/local/lib/python3.11/site-packages/pyspark"
-        res = subprocess.run(
-            ["/usr/local/lib/python3.11/site-packages/pyspark/bin/spark-submit", "pyspark-shell"],
-            capture_output=True,
-            text=True,
-            env=env,
-            timeout=15
-        )
-        spark_submit_err = f"STDOUT: {res.stdout}\nSTDERR: {res.stderr}\nEXIT: {res.returncode}\nCONN_FILE_EXISTS: {os.path.exists(conn_file)}"
+        exec_sql_res = spark_service.execute_sql("SELECT 'Spark Active' AS status, 42 AS answer", job_id="debug-sql-1")
     except Exception as e:
-        spark_submit_err = f"EXCEPTION: {type(e).__name__}: {e}"
+        exec_sql_res = {"error": f"Exception: {type(e).__name__}: {e}"}
 
     return {
         "java_bin": java_bin,
@@ -191,7 +172,7 @@ async def debug_spark_runtime():
         "JAVA_HOME": os.environ.get("JAVA_HOME"),
         "SPARK_HOME": os.environ.get("SPARK_HOME"),
         "SPARK_CONF_DIR": os.environ.get("SPARK_CONF_DIR"),
-        "spark_submit_err": spark_submit_err,
+        "exec_sql_res": exec_sql_res,
     }
 
 
