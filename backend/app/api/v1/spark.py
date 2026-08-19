@@ -169,26 +169,34 @@ async def debug_spark_runtime():
         from pyspark.conf import SparkConf
         conf = SparkConf()
         conf.set("spark.driver.memory", "200m")
-        conf.set("spark.testing.memory", "200000000")
-        gw = launch_gateway(conf)
-        gateway_output = f"Gateway successfully acquired port: {gw.gateway_parameters.port}"
-    except Exception as e:
-        gateway_err = f"{type(e).__name__}: {e}"
-    spark_submit_res = ""
-    java_test_res = ""
+    # Test running py4j.GatewayServer directly to see exact stdout and stderr
+    gateway_direct_out = ""
+    gateway_direct_err = ""
+    gateway_port = 0
     try:
-        import glob
-        pyspark_jars = glob.glob("/usr/local/lib/python3.11/site-packages/pyspark/jars/*.jar")
-        cp = ":".join(pyspark_jars)
-        res = subprocess.run(
-            [java_bin or "java", "-cp", cp, "org.apache.spark.deploy.SparkSubmit", "--version"],
-            capture_output=True,
-            text=True,
-            timeout=15
-        )
-        spark_submit_res = f"STDOUT: {res.stdout}\nSTDERR: {res.stderr}\nEXIT: {res.returncode}"
+        import os, subprocess, glob, pyspark
+        jars_dir = os.path.join(os.path.dirname(pyspark.__file__), "jars")
+        cp = f"{jars_dir}/*"
+        java_exe = os.path.join(os.environ.get("JAVA_HOME", "/usr/lib/jvm/java-17-openjdk-amd64"), "bin", "java")
+        cmd = [
+            java_exe,
+            "-Xmx200m",
+            "-XX:+UseSerialGC",
+            "-cp",
+            cp,
+            "py4j.GatewayServer",
+            "--die-on-broken-pipe",
+            "0"
+        ]
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        # Read the port line from stdout
+        port_line = proc.stdout.readline()
+        gateway_direct_out = f"Port line: {port_line.strip()}"
+        if port_line.strip().isdigit():
+            gateway_port = int(port_line.strip())
+        proc.terminate()
     except Exception as e:
-        spark_submit_res = f"SparkSubmit Error: {e}"
+        gateway_direct_err = f"{type(e).__name__}: {e}"
 
     return {
         "java_bin": java_bin,
@@ -196,9 +204,9 @@ async def debug_spark_runtime():
         "JAVA_HOME": os.environ.get("JAVA_HOME"),
         "SPARK_HOME": os.environ.get("SPARK_HOME"),
         "SPARK_CONF_DIR": os.environ.get("SPARK_CONF_DIR"),
-        "spark_submit_test": spark_submit_res,
-        "gateway_output": gateway_output,
-        "gateway_error": gateway_err,
+        "gateway_direct_out": gateway_direct_out,
+        "gateway_direct_err": gateway_direct_err,
+        "gateway_port": gateway_port,
     }
 
 
