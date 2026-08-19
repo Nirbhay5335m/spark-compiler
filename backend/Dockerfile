@@ -28,7 +28,8 @@ WORKDIR /app
 # Install Python dependencies
 COPY backend/requirements.txt /app/backend/requirements.txt
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r /app/backend/requirements.txt
+    pip install --no-cache-dir -r /app/backend/requirements.txt && \
+    chmod -R +x /usr/local/lib/python3.11/site-packages/pyspark/bin || true
 
 # Copy backend application code
 COPY backend/ /app/backend/

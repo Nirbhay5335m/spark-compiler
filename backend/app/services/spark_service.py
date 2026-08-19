@@ -149,7 +149,7 @@ class SparkService:
         self.jobs_dir.mkdir(parents=True, exist_ok=True)
 
     def _ensure_spark_path(self) -> None:
-        """Injects SPARK_HOME python packages into sys.path if PySpark is bundled locally."""
+        """Injects SPARK_HOME python packages into sys.path and ensures executable permissions on Linux."""
         spark_home = settings.SPARK_HOME
         if spark_home and Path(spark_home).is_dir():
             py_path = Path(spark_home) / "python"
@@ -162,6 +162,19 @@ class SparkService:
                 for zip_file in lib_path.glob("*.zip"):
                     if str(zip_file) not in sys.path:
                         sys.path.insert(0, str(zip_file))
+
+        if os.name != "nt":
+            try:
+                import pyspark
+                bin_dir = Path(pyspark.__file__).parent / "bin"
+                if bin_dir.exists():
+                    for f in bin_dir.glob("*"):
+                        try:
+                            f.chmod(f.stat().st_mode | 0o755)
+                        except Exception:
+                            pass
+            except Exception:
+                pass
 
     def detect_java(self) -> Dict[str, Any]:
         """Detects Java runtime environment and version."""
