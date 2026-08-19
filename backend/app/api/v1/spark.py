@@ -165,59 +165,25 @@ async def debug_spark_runtime():
         os.environ.pop("SPARK_HOME", None)
         os.environ.pop("_JAVA_OPTIONS", None)
 
-        import os, subprocess, pyspark, secrets
-        from py4j.java_gateway import JavaGateway, GatewayParameters
-        from pyspark import SparkConf, SparkContext
-        from pyspark.sql import SparkSession
-
-        jars_dir = os.path.join(os.path.dirname(pyspark.__file__), "jars")
-        cp = f"{jars_dir}/*"
-        java_exe = os.path.join(os.environ.get("JAVA_HOME", "/usr/lib/jvm/java-17-openjdk-amd64"), "bin", "java")
-        cmd = [
-            java_exe,
-            "-Xms64m",
-            "-Xmx220m",
-            "-XX:+UseSerialGC",
-            "-XX:+TieredCompilation",
-            "-XX:TieredStopAtLevel=1",
-            "-Djava.security.egd=file:/dev/./urandom",
-            "-cp",
-            cp,
-            "py4j.GatewayServer",
-            "--die-on-broken-pipe",
-            "0"
-        ]
-        auth_token = secrets.token_hex(16)
-        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        try:
-            proc.stdin.write(auth_token + "\n")
-            proc.stdin.flush()
-        except Exception:
-            pass
-
-        port_line = proc.stdout.readline()
-        port = int(port_line.strip())
-        gw = JavaGateway(gateway_parameters=GatewayParameters(port=port, auth_token=auth_token, auto_convert=True))
-
-        conf = SparkConf()
-        conf.setMaster("local[1]")
-        conf.setAppName("DebugTest")
-        conf.set("spark.ui.enabled", "false")
-        conf.set("spark.driver.host", "127.0.0.1")
-        conf.set("spark.driver.bindAddress", "127.0.0.1")
-        conf.set("spark.sql.shuffle.partitions", "1")
-        conf.set("spark.testing.memory", "200000000")
-        conf.set("spark.driver.memory", "200m")
-
-        sc = SparkContext(conf=conf, gateway=gw)
-        spark = SparkSession(sc)
-        df = spark.sql("SELECT 'Spark 4.2 Live on Render' as message, 100 as value")
-        rows = [r.asDict() for r in df.collect()]
-        spark_sql_test_res = f"SUCCESS: {rows}"
-        spark.stop()
-        proc.terminate()
+    spark_submit_err = ""
+    try:
+        import subprocess, tempfile, os
+        temp_dir = tempfile.mkdtemp()
+        conn_file = os.path.join(temp_dir, "conn_info")
+        env = dict(os.environ)
+        env["_PYSPARK_DRIVER_CONN_INFO_PATH"] = conn_file
+        env["JAVA_HOME"] = "/usr/lib/jvm/java-17-openjdk-amd64"
+        env["SPARK_HOME"] = "/usr/local/lib/python3.11/site-packages/pyspark"
+        res = subprocess.run(
+            ["/usr/local/lib/python3.11/site-packages/pyspark/bin/spark-submit", "pyspark-shell"],
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=15
+        )
+        spark_submit_err = f"STDOUT: {res.stdout}\nSTDERR: {res.stderr}\nEXIT: {res.returncode}\nCONN_FILE_EXISTS: {os.path.exists(conn_file)}"
     except Exception as e:
-        spark_sql_test_res = f"FAILED: {type(e).__name__}: {e}"
+        spark_submit_err = f"EXCEPTION: {type(e).__name__}: {e}"
 
     return {
         "java_bin": java_bin,
@@ -225,7 +191,7 @@ async def debug_spark_runtime():
         "JAVA_HOME": os.environ.get("JAVA_HOME"),
         "SPARK_HOME": os.environ.get("SPARK_HOME"),
         "SPARK_CONF_DIR": os.environ.get("SPARK_CONF_DIR"),
-        "spark_sql_test_res": spark_sql_test_res,
+        "spark_submit_err": spark_submit_err,
     }
 
 
