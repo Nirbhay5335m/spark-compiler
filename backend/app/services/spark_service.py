@@ -291,8 +291,10 @@ class SparkService:
 
             if settings.JAVA_HOME and not os.environ.get("JAVA_HOME"):
                 os.environ["JAVA_HOME"] = settings.JAVA_HOME
-            if settings.SPARK_HOME and not os.environ.get("SPARK_HOME"):
+            if settings.SPARK_HOME:
                 os.environ["SPARK_HOME"] = settings.SPARK_HOME
+            else:
+                os.environ.pop("SPARK_HOME", None)
 
             from pyspark.sql import SparkSession
             logger.info(f"Lazily initializing shared SparkSession '{app_name}'...")
@@ -406,6 +408,8 @@ class SparkService:
             env["JAVA_HOME"] = settings.JAVA_HOME
         if settings.SPARK_HOME:
             env["SPARK_HOME"] = settings.SPARK_HOME
+        else:
+            env.pop("SPARK_HOME", None)
         
         env["PYSPARK_PYTHON"] = sys.executable
         env["PYSPARK_DRIVER_PYTHON"] = sys.executable

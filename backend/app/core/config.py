@@ -49,19 +49,14 @@ def _detect_java_home() -> str:
 
 
 def _detect_spark_home() -> str:
-    """Auto-detect SPARK_HOME on Windows and Linux containers if not explicitly set."""
-    env_spark = os.environ.get("SPARK_HOME")
-    if env_spark and Path(env_spark).exists():
-        return env_spark
+    """Auto-detect SPARK_HOME only if a standalone Spark distribution is present.
     
-    # Check PySpark site-packages directory
-    try:
-        import pyspark
-        pyspark_dir = Path(pyspark.__file__).parent
-        if (pyspark_dir / "jars").exists() or (pyspark_dir / "bin").exists():
-            return str(pyspark_dir)
-    except Exception:
-        pass
+    For pip-installed PySpark packages, SPARK_HOME should remain empty so PySpark
+    launches GatewayServer directly without requiring external shell wrappers.
+    """
+    env_spark = os.environ.get("SPARK_HOME")
+    if env_spark and Path(env_spark).exists() and "site-packages" not in env_spark:
+        return env_spark
 
     candidates = [
         Path("/opt/spark"),

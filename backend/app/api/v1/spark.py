@@ -163,6 +163,8 @@ async def debug_spark_runtime():
     gateway_output = ""
     gateway_err = ""
     try:
+        os.environ.pop("SPARK_HOME", None)
+        os.environ.pop("_JAVA_OPTIONS", None)
         from pyspark.java_gateway import launch_gateway
         from pyspark.conf import SparkConf
         conf = SparkConf()
@@ -170,7 +172,8 @@ async def debug_spark_runtime():
         conf.set("spark.testing.memory", "200000000")
         gw = launch_gateway(conf)
         gateway_output = f"Gateway successfully acquired port: {gw.gateway_parameters.port}"
-    # Run java directly with PySpark jar classpath to see exact error
+    except Exception as e:
+        gateway_err = f"{type(e).__name__}: {e}"
     spark_submit_res = ""
     java_test_res = ""
     try:
