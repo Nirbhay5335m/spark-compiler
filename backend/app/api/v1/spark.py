@@ -160,18 +160,24 @@ async def debug_spark_runtime():
         res = subprocess.run([java_bin, "-version"], capture_output=True, text=True)
         java_ver = res.stderr or res.stdout
 
-    gateway_direct_out = ""
-    gateway_direct_err = ""
-    gateway_port = 0
+    spark_sql_test_res = ""
     try:
+        from pyspark import SparkConf, SparkContext
+        from pyspark.sql import SparkSession
+        from py4j.java_gateway import JavaGateway, GatewayParameters
         import os, subprocess, pyspark
+
         jars_dir = os.path.join(os.path.dirname(pyspark.__file__), "jars")
         cp = f"{jars_dir}/*"
         java_exe = os.path.join(os.environ.get("JAVA_HOME", "/usr/lib/jvm/java-17-openjdk-amd64"), "bin", "java")
         cmd = [
             java_exe,
-            "-Xmx200m",
+            "-Xms64m",
+            "-Xmx220m",
             "-XX:+UseSerialGC",
+            "-XX:+TieredCompilation",
+            "-XX:TieredStopAtLevel=1",
+            "-Djava.security.egd=file:/dev/./urandom",
             "-cp",
             cp,
             "py4j.GatewayServer",
@@ -180,12 +186,28 @@ async def debug_spark_runtime():
         ]
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         port_line = proc.stdout.readline()
-        gateway_direct_out = f"Port line: {port_line.strip()}"
-        if port_line.strip().isdigit():
-            gateway_port = int(port_line.strip())
+        port = int(port_line.strip())
+        gw = JavaGateway(gateway_parameters=GatewayParameters(port=port, auto_convert=True))
+
+        conf = SparkConf()
+        conf.setMaster("local[1]")
+        conf.setAppName("DebugTest")
+        conf.set("spark.ui.enabled", "false")
+        conf.set("spark.driver.host", "127.0.0.1")
+        conf.set("spark.driver.bindAddress", "127.0.0.1")
+        conf.set("spark.sql.shuffle.partitions", "1")
+        conf.set("spark.testing.memory", "200000000")
+        conf.set("spark.driver.memory", "200m")
+
+        sc = SparkContext(conf=conf, gateway=gw)
+        spark = SparkSession(sc)
+        df = spark.sql("SELECT 'Spark 4.2 Live on Render' as message, 100 as value")
+        rows = [r.asDict() for r in df.collect()]
+        spark_sql_test_res = f"SUCCESS: {rows}"
+        spark.stop()
         proc.terminate()
     except Exception as e:
-        gateway_direct_err = f"{type(e).__name__}: {e}"
+        spark_sql_test_res = f"FAILED: {type(e).__name__}: {e}"
 
     return {
         "java_bin": java_bin,
@@ -193,9 +215,7 @@ async def debug_spark_runtime():
         "JAVA_HOME": os.environ.get("JAVA_HOME"),
         "SPARK_HOME": os.environ.get("SPARK_HOME"),
         "SPARK_CONF_DIR": os.environ.get("SPARK_CONF_DIR"),
-        "gateway_direct_out": gateway_direct_out,
-        "gateway_direct_err": gateway_direct_err,
-        "gateway_port": gateway_port,
+        "spark_sql_test_res": spark_sql_test_res,
     }
 
 
