@@ -150,6 +150,41 @@ async def execute_spark_sql(payload: SparkSQLExecuteRequest):
     return result
 
 
+@router.get("/debug")
+async def debug_spark_runtime():
+    """Diagnostic endpoint to inspect Java runtime, PySpark gateway launch output, and environment."""
+    import os, sys, shutil, subprocess
+    java_bin = shutil.which("java")
+    java_ver = ""
+    if java_bin:
+        res = subprocess.run([java_bin, "-version"], capture_output=True, text=True)
+        java_ver = res.stderr or res.stdout
+
+    gateway_output = ""
+    gateway_err = ""
+    try:
+        from pyspark.java_gateway import launch_gateway
+        from pyspark.conf import SparkConf
+        conf = SparkConf()
+        conf.set("spark.driver.memory", "200m")
+        conf.set("spark.testing.memory", "200000000")
+        gw = launch_gateway(conf)
+        gateway_output = f"Gateway successfully acquired port: {gw.gateway_parameters.port}"
+    except Exception as e:
+        gateway_err = f"{type(e).__name__}: {e}"
+
+    return {
+        "java_bin": java_bin,
+        "java_version_raw": java_ver,
+        "JAVA_HOME": os.environ.get("JAVA_HOME"),
+        "SPARK_HOME": os.environ.get("SPARK_HOME"),
+        "SPARK_CONF_DIR": os.environ.get("SPARK_CONF_DIR"),
+        "sys_executable": sys.executable,
+        "gateway_output": gateway_output,
+        "gateway_error": gateway_err,
+    }
+
+
 @router.post(
     "/cancel/{job_id}",
     response_model=SparkCancelResponse,
@@ -165,3 +200,4 @@ async def cancel_spark_job(job_id: str):
         "cancelled": cancelled,
         "message": "Job cancelled successfully." if cancelled else "Job not found or already finished.",
     }
+
