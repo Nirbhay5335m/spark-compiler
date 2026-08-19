@@ -184,10 +184,15 @@ async def debug_spark_runtime():
             "--die-on-broken-pipe",
             "0"
         ]
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        import secrets
+        auth_token = secrets.token_hex(16)
+        env = os.environ.copy()
+        env["PYSPARK_GATEWAY_SECRET"] = auth_token
+
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
         port_line = proc.stdout.readline()
         port = int(port_line.strip())
-        gw = JavaGateway(gateway_parameters=GatewayParameters(port=port, auto_convert=True))
+        gw = JavaGateway(gateway_parameters=GatewayParameters(port=port, auth_token=auth_token, auto_convert=True))
 
         conf = SparkConf()
         conf.setMaster("local[1]")
