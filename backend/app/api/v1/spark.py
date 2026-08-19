@@ -160,21 +160,11 @@ async def debug_spark_runtime():
         res = subprocess.run([java_bin, "-version"], capture_output=True, text=True)
         java_ver = res.stderr or res.stdout
 
-    gateway_output = ""
-    gateway_err = ""
-    try:
-        os.environ.pop("SPARK_HOME", None)
-        os.environ.pop("_JAVA_OPTIONS", None)
-        from pyspark.java_gateway import launch_gateway
-        from pyspark.conf import SparkConf
-        conf = SparkConf()
-        conf.set("spark.driver.memory", "200m")
-    # Test running py4j.GatewayServer directly to see exact stdout and stderr
     gateway_direct_out = ""
     gateway_direct_err = ""
     gateway_port = 0
     try:
-        import os, subprocess, glob, pyspark
+        import os, subprocess, pyspark
         jars_dir = os.path.join(os.path.dirname(pyspark.__file__), "jars")
         cp = f"{jars_dir}/*"
         java_exe = os.path.join(os.environ.get("JAVA_HOME", "/usr/lib/jvm/java-17-openjdk-amd64"), "bin", "java")
@@ -189,7 +179,6 @@ async def debug_spark_runtime():
             "0"
         ]
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        # Read the port line from stdout
         port_line = proc.stdout.readline()
         gateway_direct_out = f"Port line: {port_line.strip()}"
         if port_line.strip().isdigit():
