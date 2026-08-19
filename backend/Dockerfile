@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     procps \
     curl \
     ca-certificates \
+    && ln -sf /bin/bash /bin/sh \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
